@@ -74,3 +74,39 @@ test_case(lexer_next_punctuation)
 
     test_success();
 }
+
+// https://www.cogsci.ed.ac.uk/~richard/utf-8.cgi
+test_case(utf8_to_codepoint)
+{
+    int size;
+
+    test_assert(utf8_to_codepoint("\x61", &size) == 0x61); // a
+    test_assert(size == 1);
+
+    test_assert(utf8_to_codepoint("\xc2\xa2", &size) == 0xa2); // ¢
+    test_assert(size == 2);
+
+    test_assert(utf8_to_codepoint("\xe2\x82\xac", &size) == 0x20ac); // €
+    test_assert(size == 3);
+
+    test_assert(utf8_to_codepoint("\xf0\x9f\x9e\x85", &size) == 0x1f785); // 🞅
+    test_assert(size == 4);
+
+    // Lone continuation byte
+    test_assert(utf8_to_codepoint("\x80", NULL) == -1);
+
+    // Overlong encodings
+    test_assert(utf8_to_codepoint("\xc0\xbf", NULL) == -1);
+    test_assert(utf8_to_codepoint("\xe0\x80\xbf", NULL) == -1);
+    test_assert(utf8_to_codepoint("\xf0\x80\x80\xbf", NULL) == -1);
+
+    // Surrogates
+    test_assert(utf8_to_codepoint("\xed\xa0\x80", NULL) == -1);
+    test_assert(utf8_to_codepoint("\xed\xbf\xbf", NULL) == -1);
+
+    // Invalid bytes
+    test_assert(utf8_to_codepoint("\xfe", NULL) == -1);
+    test_assert(utf8_to_codepoint("\xff", NULL) == -1);
+
+    test_success();
+}
