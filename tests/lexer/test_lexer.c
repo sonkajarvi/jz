@@ -4,10 +4,19 @@
 #include <jz/token.h>
 #include <test.h>
 
-// Assert the next token is @expected, and EOF the one after that
+// Asserts the next token is @expected, and EOF the one after that
 #define ASSERT_NEXT(lx, string, expected) {         \
     lexer_init(&lx, string, strlen(string));        \
     test_assert(lexer_next(&lx)->type == expected); \
+    test_assert(lexer_next(&lx)->type == TOKEN_EOF); }
+
+// Asserts the nexst token is an identifier with @expected as value,
+// and EOF the one after that
+#define ASSERT_IDENTIFIER(lx, _string, expected) {  \
+    lexer_init(&lx, _string, strlen(_string));      \
+    struct token *tk = lexer_next(&lx);             \
+    test_assert(tk->type == TOKEN_IDENTIFIER);      \
+    test_assert(strcmp(tk->string, expected) == 0); \
     test_assert(lexer_next(&lx)->type == TOKEN_EOF); }
 
 test_case(lexer_next_punctuator)
@@ -127,6 +136,16 @@ test_case(lexer_next_keyword)
     ASSERT_NEXT(lx, "with", TOKEN_WITH);
     ASSERT_NEXT(lx, "while", TOKEN_WHILE);
     ASSERT_NEXT(lx, "yield", TOKEN_YIELD);
+
+    test_success();
+}
+
+test_case(lexer_next_identifier)
+{
+    struct lexer lx;
+
+    // Starts with keyword
+    ASSERT_IDENTIFIER(lx, "constt", "constt");
 
     test_success();
 }

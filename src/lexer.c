@@ -358,8 +358,6 @@ static int maybe_keyword(const char *s)
 
 #undef C
 
-    printf("Unknown keyword: %s\n", s);
-
     return -1;
 }
 

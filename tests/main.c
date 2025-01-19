@@ -5,6 +5,7 @@ int main(void)
     // Lexer
     test_declare(lexer_next_punctuator);
     test_declare(lexer_next_keyword);
+    test_declare(lexer_next_identifier);
 
     test_declare(utf8_to_codepoint);
 
