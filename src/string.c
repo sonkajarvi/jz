@@ -20,11 +20,11 @@ void string_free(struct string *str)
 
 int string_append(struct string *str, char c)
 {
-    if (!str || !c)
+    if (!str)
         return -1;
 
     char *tmp = str->data;
-    if (str->length + 1 < str->capacity)
+    if (str->length < str->capacity)
         goto skip_realloc;
 
     str->capacity = 2 * str->capacity ?: STRING_DEFAULT_CAPACITY;
@@ -34,7 +34,6 @@ int string_append(struct string *str, char c)
 
 skip_realloc:
     str->data[str->length++] = c;
-    str->data[str->length] = '\0';
     return 0;
 }
 
@@ -49,7 +48,7 @@ int string_append_range(struct string *str, const char *s, const size_t n)
         return -1;
 
     char *tmp = str->data;
-    if (str->length + n + 1 < str->capacity)
+    if (str->length + n < str->capacity)
         goto skip_realloc;
 
     while (str->capacity < str->length + n)
@@ -62,7 +61,6 @@ int string_append_range(struct string *str, const char *s, const size_t n)
 skip_realloc:
     memcpy(&str->data[str->length], s, n);
     str->length += n;
-    str->data[str->length] = '\0';
     return 0;
 }
 
@@ -113,13 +111,24 @@ int string_reserve(struct string *str, const size_t n)
 
 const char *string_ref(struct string *str)
 {
-    return str ? str->data : NULL;
+    if (!str || !str->data)
+        return NULL;
+
+    // Add null terminator
+    if (str->capacity == str->length || str->data[str->length] > 0)
+        string_append(str, '\0');
+
+    return str->data;
 }
 
 char *string_release(struct string *str)
 {
-    if (!str)
+    if (!str || !str->data)
         return NULL;
+
+    // Add null terminator
+    if (str->capacity == str->length || str->data[str->length] > 0)
+        string_append(str, '\0');
 
     char *tmp = str->data;
     memset(str, 0, sizeof(*str));
