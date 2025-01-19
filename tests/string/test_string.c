@@ -1,9 +1,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <test.h>
-
 #include <jz/string.h>
+#include <test.h>
 
 #define LARGE 100000
 
@@ -22,7 +21,7 @@ test_case(string_free)
     test_success();
 }
 
-test_case(string_append_char)
+test_case(string_append)
 {
     struct string s = {0};
 
@@ -36,7 +35,7 @@ test_case(string_append_char)
     test_success();
 }
 
-test_case(string_append_chars_n)
+test_case(string_append_range)
 {
     struct string s = {0};
 
@@ -45,6 +44,28 @@ test_case(string_append_chars_n)
 
     test_assert(s.data != NULL);
     test_assert(s.length == 3 * LARGE);
+    string_free(&s);
+
+    test_success();
+}
+
+test_case(string_append_codepoint)
+{
+    struct string s = {0};
+
+    test_assert(string_append_codepoint(&s, 0x61) == 0); // a
+    test_assert(string_append_codepoint(&s, 0xa2) == 0); // ¢
+    test_assert(string_append_codepoint(&s, 0x20ac) == 0); // €
+    test_assert(string_append_codepoint(&s, 0x1f785) == 0); // 🞅
+
+    // Surrogates
+    test_assert(string_append_codepoint(&s, 0xd800) == -1);
+    test_assert(string_append_codepoint(&s, 0xdfff) == -1);
+
+    test_assert(s.data != NULL);
+    test_assert(s.length == 10);
+    test_assert(strcmp(string_ref(&s),
+        "\x61\xc2\xa2\xe2\x82\xac\xf0\x9f\x9e\x85") == 0);
     string_free(&s);
 
     test_success();

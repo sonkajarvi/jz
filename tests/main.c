@@ -9,8 +9,9 @@ int main(void)
 
     // String
     test_declare(string_free);
-    test_declare(string_append_char);
-    test_declare(string_append_chars_n);
+    test_declare(string_append);
+    test_declare(string_append_range);
+    test_declare(string_append_codepoint);
     test_declare(string_reserve);
     test_declare(string_ref);
     test_declare(string_release);

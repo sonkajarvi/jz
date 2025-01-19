@@ -66,6 +66,36 @@ skip_realloc:
     return 0;
 }
 
+int string_append_codepoint(struct string *str, const int cp)
+{
+    switch (cp) {
+    case 0 ... 0x7f:
+        string_append(str, cp);
+        return 0;
+
+    case 0x80 ... 0x7ff:
+        string_append(str, ((cp >> 6) & 0x1f) | 0xc0);
+        string_append(str, (cp        & 0x3f) | 0x80);
+        return 0;
+
+    case 0x800 ... 0xd7ff:
+    case 0xe000 ... 0xffff:
+        string_append(str, ((cp >> 12) & 0x0f) | 0xe0);
+        string_append(str, ((cp >> 6)  & 0x3f) | 0x80);
+        string_append(str, (cp         & 0x3f) | 0x80);
+        return 0;
+
+    case 0x10000 ... 0x10ffff:
+        string_append(str, ((cp >> 18) & 0x07) | 0xf0);
+        string_append(str, ((cp >> 12) & 0x3f) | 0x80);
+        string_append(str, ((cp >> 6)  & 0x3f) | 0x80);
+        string_append(str, (cp         & 0x3f) | 0x80);
+        return 0;
+    }
+
+    return -1;
+}
+
 int string_reserve(struct string *str, const size_t n)
 {
     if (!str || n <= str->capacity)
