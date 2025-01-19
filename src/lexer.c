@@ -165,7 +165,7 @@ void lexer_init(struct lexer *lx, const char *bytes, const size_t size)
     lx->index = 0;
     lx->size = size;
 
-    token_set(&lx->current, TOKEN_UNKNOWN);
+    token_set(&lx->current, TOKEN_INVALID);
 }
 
 struct token *lexer_next(struct lexer *lx)

@@ -70,6 +70,7 @@
     T(IN)                             /* in */ \
     T(INSTANCEOF)                     /* instanceof */ \
     T(INTERFACE)                      /* Reserved for future use (strict) */ \
+    T(INVALID)                        /* For internal use */ \
     \
     T(LESS)                           /* < */ \
     T(LESS_EQUALS)                    /* <= */ \
@@ -103,7 +104,6 @@
     T(QUESTION_QUESTION_EQUALS)       /* ??= */ \
     \
     T(REGEX_LITERAL)                  \
-    \
     T(RETURN)                         /* return */ \
     \
     T(SEMICOLON)                      /* ; */ \
@@ -119,7 +119,6 @@
     T(TEMPLATE_HEAD)                  \
     T(TEMPLATE_MIDDLE)                \
     T(TEMPLATE_TAIL)                  \
-    \
     T(TILDE)                          /* ~ */ \
     T(THIS)                           /* this */ \
     T(THROW)                          /* throw */ \
@@ -128,7 +127,6 @@
     T(TYPEOF)                         /* typeof */ \
     \
     T(UNDEFINED)                      /* undefined */ \
-    T(UNKNOWN)                        /* For internal use */ \
     \
     T(VAR)                            /* var */ \
     T(VERTICAL)                       /* | */ \
@@ -153,6 +151,9 @@ enum token_type : uint8_t
 struct token
 {
     int type;
+
+    size_t start;
+    size_t end;
 
     double number;
     char *string;
