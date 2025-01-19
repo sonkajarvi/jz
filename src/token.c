@@ -30,16 +30,18 @@ void token_set_numeric_literal(struct token *tok, double number)
     tok->number = number;
 }
 
-void token_set_string_literal(struct token *tok, char *s)
+void token_set_string_literal(struct token *tok, char *s, size_t size)
 {
     token_set(tok, TOKEN_STRING_LITERAL);
     tok->string = s;
+    tok->size = size;
 }
 
-void token_set_identifier(struct token *tok, char *s)
+void token_set_identifier(struct token *tok, char *s, size_t size)
 {
     token_set(tok, TOKEN_IDENTIFIER);
     tok->string = s;
+    tok->size = size;
 }
 
 void token_print(struct token *tok)

@@ -156,13 +156,15 @@ struct token
     size_t end;
 
     double number;
+
     char *string;
+    size_t size;
 };
 
 void token_set(struct token *tok, int type);
 void token_set_numeric_literal(struct token *tok, double number);
-void token_set_string_literal(struct token *tok, char *s);
-void token_set_identifier(struct token *tok, char *s);
+void token_set_string_literal(struct token *tok, char *s, size_t size);
+void token_set_identifier(struct token *tok, char *s, size_t size);
 
 const char *token_stringify(struct token *tok);
 void token_print(struct token *tok);
