@@ -18,6 +18,11 @@ target_include_directories(jz PUBLIC
     include
 )
 
+find_package(ICU REQUIRED COMPONENTS uc)
+target_link_libraries(jz PRIVATE
+    ICU::uc
+)
+
 target_compile_options(jz PRIVATE
     -g
     -O3
