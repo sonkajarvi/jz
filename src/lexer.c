@@ -4,13 +4,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <unicode/uchar.h>
+
 #include <jz/lexer.h>
 #include <jz/token.h>
-
-static bool is_whitespace(const int c)
-{
-    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
-}
 
 static int peek_n(struct lexer *lx, const size_t n)
 {
@@ -88,6 +85,69 @@ int utf8_to_codepoint(const char *bytes, int *size)
 #undef B
 
     return -1;
+}
+
+
+// is_whitespace()
+//
+// Checks if the current character is a whitespace character.
+// Returns the size of the character in bytes, or zero if not whitespace
+//
+// 12.2 White Space (https://tc39.es/ecma262/#sec-white-space)
+//   Whitespace ::
+//     <TAB>            ; Character tabulation
+//     <VT>             ; Line tabulation
+//     <FF>             ; Form feed
+//     <ZWNBSP>         ; Zero width no-break space
+//     <USP>            ; Any code point in general category "Space_Separator"
+//
+// @bytes: UTF-8 encoded character
+static int is_whitespace(const char *bytes)
+{
+    int c, size;
+
+    // Character is ASCII
+    if ((c = bytes[0]) < 0x80)
+        return c == ' ' || c == '\t' || c == '\v' || c == '\f';
+
+    if ((c = utf8_to_codepoint(bytes, &size)) == -1)
+        return 0;
+
+    return c == 0xffef || u_isUWhiteSpace(c);
+}
+
+// is_line_terminator()
+//
+// Checks if the current character is a line terminator. Returns the size of
+// the character in bytes, or zero if not a line terminator
+//
+// 12.3 Line Terminators (https://tc39.es/ecma262/#sec-line-terminators)
+//   LineTerminator ::
+//     <LF>             ; Line feed
+//     <CR>             ; Carriage return
+//     <LS>             ; Line separator
+//     <PS>             ; Paragraph separator
+//
+// @bytes: UTF-8 encoded character
+static int is_line_terminator(const char *bytes)
+{
+    int c, size;
+
+    // Character is ASCII
+    if ((c = bytes[0]) < 0x80)
+        return c == '\n' || c == '\r';
+
+    if ((c = utf8_to_codepoint(bytes, &size)) == -1)
+        return 0;
+
+    switch (c) {
+    case 0x2028:
+    case 0x2029:
+        return size;
+
+    default:
+        return 0;
+    }
 }
 
 static void skip_whitespace(struct lexer *lx)
