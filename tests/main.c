@@ -3,7 +3,8 @@
 int main(void)
 {
     // Lexer
-    test_declare(lexer_next_punctuation);
+    test_declare(lexer_next_punctuator);
+    test_declare(lexer_next_keyword);
 
     test_declare(utf8_to_codepoint);
 

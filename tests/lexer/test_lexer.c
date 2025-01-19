@@ -10,7 +10,7 @@
     test_assert(lexer_next(&lx)->type == expected); \
     test_assert(lexer_next(&lx)->type == TOKEN_EOF); }
 
-test_case(lexer_next_punctuation)
+test_case(lexer_next_punctuator)
 {
     struct lexer lx;
 
@@ -71,6 +71,62 @@ test_case(lexer_next_punctuation)
     ASSERT_NEXT(lx, "|=", TOKEN_VERTICAL_EQUALS);
     ASSERT_NEXT(lx, "||", TOKEN_VERTICAL_VERTICAL);
     ASSERT_NEXT(lx, "||=", TOKEN_VERTICAL_VERTICAL_EQUALS);
+
+    test_success();
+}
+
+test_case(lexer_next_keyword)
+{
+    struct lexer lx;
+
+    ASSERT_NEXT(lx, "async", TOKEN_ASYNC);
+    ASSERT_NEXT(lx, "await", TOKEN_AWAIT);
+    ASSERT_NEXT(lx, "break", TOKEN_BREAK);
+    ASSERT_NEXT(lx, "case", TOKEN_CASE);
+    ASSERT_NEXT(lx, "catch", TOKEN_CATCH);
+    ASSERT_NEXT(lx, "class", TOKEN_CLASS);
+    ASSERT_NEXT(lx, "const", TOKEN_CONST);
+    ASSERT_NEXT(lx, "continue", TOKEN_CONTINUE);
+    ASSERT_NEXT(lx, "debugger", TOKEN_DEBUGGER);
+    ASSERT_NEXT(lx, "default", TOKEN_DEFAULT);
+    ASSERT_NEXT(lx, "delete", TOKEN_DELETE);
+    ASSERT_NEXT(lx, "do", TOKEN_DO);
+    ASSERT_NEXT(lx, "else", TOKEN_ELSE);
+    ASSERT_NEXT(lx, "enum", TOKEN_ENUM);
+    ASSERT_NEXT(lx, "export", TOKEN_EXPORT);
+    ASSERT_NEXT(lx, "extends", TOKEN_EXTENDS);
+    ASSERT_NEXT(lx, "false", TOKEN_FALSE);
+    ASSERT_NEXT(lx, "finally", TOKEN_FINALLY);
+    ASSERT_NEXT(lx, "for", TOKEN_FOR);
+    ASSERT_NEXT(lx, "function", TOKEN_FUNCTION);
+    ASSERT_NEXT(lx, "if", TOKEN_IF);
+    ASSERT_NEXT(lx, "implements", TOKEN_IMPLEMENTS);
+    ASSERT_NEXT(lx, "import", TOKEN_IMPORT);
+    ASSERT_NEXT(lx, "in", TOKEN_IN);
+    ASSERT_NEXT(lx, "instanceof", TOKEN_INSTANCEOF);
+    ASSERT_NEXT(lx, "interface", TOKEN_INTERFACE);
+    ASSERT_NEXT(lx, "let", TOKEN_LET);
+    ASSERT_NEXT(lx, "new", TOKEN_NEW);
+    ASSERT_NEXT(lx, "null", TOKEN_NULL);
+    ASSERT_NEXT(lx, "package", TOKEN_PACKAGE);
+    ASSERT_NEXT(lx, "private", TOKEN_PRIVATE);
+    ASSERT_NEXT(lx, "protected", TOKEN_PROTECTED);
+    ASSERT_NEXT(lx, "public", TOKEN_PUBLIC);
+    ASSERT_NEXT(lx, "return", TOKEN_RETURN);
+    ASSERT_NEXT(lx, "static", TOKEN_STATIC);
+    ASSERT_NEXT(lx, "super", TOKEN_SUPER);
+    ASSERT_NEXT(lx, "switch", TOKEN_SWITCH);
+    ASSERT_NEXT(lx, "this", TOKEN_THIS);
+    ASSERT_NEXT(lx, "throw", TOKEN_THROW);
+    ASSERT_NEXT(lx, "true", TOKEN_TRUE);
+    ASSERT_NEXT(lx, "try", TOKEN_TRY);
+    ASSERT_NEXT(lx, "typeof", TOKEN_TYPEOF);
+    ASSERT_NEXT(lx, "undefined", TOKEN_UNDEFINED);
+    ASSERT_NEXT(lx, "var", TOKEN_VAR);
+    ASSERT_NEXT(lx, "void", TOKEN_VOID);
+    ASSERT_NEXT(lx, "with", TOKEN_WITH);
+    ASSERT_NEXT(lx, "while", TOKEN_WHILE);
+    ASSERT_NEXT(lx, "yield", TOKEN_YIELD);
 
     test_success();
 }
