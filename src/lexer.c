@@ -7,6 +7,7 @@
 #include <unicode/uchar.h>
 
 #include <jz/lexer.h>
+#include <jz/string.h>
 #include <jz/token.h>
 
 static int peek_n(struct lexer *lx, const size_t n)
@@ -29,6 +30,11 @@ static int read(struct lexer *lx)
         lx->index++;
 
     return c;
+}
+
+static const char *lexer_position(struct lexer *lx)
+{
+    return &lx->buffer[lx->index];
 }
 
 int utf8_to_codepoint(const char *bytes, int *size)
@@ -239,10 +245,175 @@ not_ascii:
     return u_isIDPart(cp);
 }
 
+// maybe_keyword()
+//
+// Returns the corresponding token type for a keyword, or -1
+//
+// @s: String to check
+static int maybe_keyword(const char *s)
+{
+#define C(str, tok) \
+        if (strcmp(s, str) == 0) return tok;
+
+    switch (*s) {
+    case 'a':
+        C("await", TOKEN_AWAIT);
+        C("async", TOKEN_ASYNC);
+        break;
+
+    case 'b':
+        C("break", TOKEN_BREAK);
+        break;
+
+    case 'c':
+        C("case", TOKEN_CASE);
+        C("catch", TOKEN_CATCH);
+        C("class", TOKEN_CLASS);
+        C("const", TOKEN_CONST);
+        C("continue", TOKEN_CONTINUE);
+        break;
+
+    case 'd':
+        C("debugger", TOKEN_DEBUGGER);
+        C("default", TOKEN_DEFAULT);
+        C("delete", TOKEN_DELETE);
+        C("do", TOKEN_DO);
+        break;
+
+    case 'e':
+        C("else", TOKEN_ELSE);
+        C("enum", TOKEN_ENUM);
+        C("export", TOKEN_EXPORT);
+        C("extends", TOKEN_EXTENDS);
+        break;
+
+    case 'f':
+        C("false", TOKEN_FALSE);
+        C("finally", TOKEN_FINALLY);
+        C("for", TOKEN_FOR);
+        C("function", TOKEN_FUNCTION);
+        break;
+
+    case 'i':
+        C("if", TOKEN_IF);
+        C("implements", TOKEN_IMPLEMENTS);
+        C("import", TOKEN_IMPORT);
+        C("in", TOKEN_IN);
+        C("instanceof", TOKEN_INSTANCEOF);
+        C("interface", TOKEN_INTERFACE);
+        break;
+
+    case 'l':
+        C("let", TOKEN_LET);
+        break;
+
+    case 'n':
+        C("new", TOKEN_NEW);
+        C("null", TOKEN_NULL);
+        break;
+
+    case 'p':
+        C("package", TOKEN_PACKAGE);
+        C("private", TOKEN_PRIVATE);
+        C("protected", TOKEN_PROTECTED);
+        C("public", TOKEN_PUBLIC);
+        break;
+
+    case 'r':
+        C("return", TOKEN_RETURN);
+        break;
+
+    case 's':
+        C("static", TOKEN_STATIC);
+        C("super", TOKEN_SUPER);
+        C("switch", TOKEN_SWITCH);
+        break;
+
+    case 't':
+        C("this", TOKEN_THIS);
+        C("throw", TOKEN_THROW);
+        C("true", TOKEN_TRUE);
+        C("try", TOKEN_TRY);
+        C("typeof", TOKEN_TYPEOF);
+        break;
+
+    case 'u':
+        C("undefined", TOKEN_UNDEFINED);
+        break;
+
+    case 'v':
+        C("var", TOKEN_VAR);
+        C("void", TOKEN_VOID);
+        break;
+
+    case 'w':
+        C("while", TOKEN_WHILE);
+        C("with", TOKEN_WITH);
+        break;
+
+    case 'y':
+        C("yield", TOKEN_YIELD);
+        break;
+    }
+
+#undef C
+
+    printf("Unknown keyword: %s\n", s);
+
+    return -1;
+}
+
+// parse_identifier()
+//
+// Parses (private) identifiers and stores its name in the identifier
+// token. If its a known keyword, the corresponding token is used instead
+//
+// 12.7 Names and Keywords (https://tc39.es/ecma262/#sec-identifier-names)
+//   PrivateIdentifier ::
+//     # IdentifierName
+//
+//   IdentifierName ::
+//     IdentifierStart
+//     IdentifierName IdentifierPart
+//
+// @lx: Pointer to the lexer
+static int parse_identifier(struct lexer *lx)
+{
+    struct string buf = {0};
+    int cp, size, type;
+
+    if (peek(lx) == '#') {
+        string_append(&buf, '#');
+        read(lx);
+    }
+
+    if ((cp = is_identifier_start(lexer_position(lx), &size)) == -1) {
+        token_set(&lx->current, TOKEN_INVALID);
+        return -1;
+    }
+
+    do {
+        string_append_codepoint(&buf, cp);
+        lx->index += size;
+    } while ((cp = is_identifier_part(lexer_position(lx), &size)) != -1);
+
+    if ((type = maybe_keyword(string_ref(&buf))) != -1) {
+        token_set(&lx->current, type);
+        string_free(&buf);
+        return 0;
+    }
+
+    string_shrink(&buf);
+    token_set_identifier(&lx->current, buf.data, buf.length);
+    return 0;
+}
+
 static void skip_whitespace(struct lexer *lx)
 {
-    while (is_whitespace(peek(lx)))
-        read(lx);
+    int size;
+
+    while ((size = is_whitespace(lexer_position(lx))))
+        lx->index += size;
 }
 
 void lexer_init(struct lexer *lx, const char *bytes, const size_t size)
@@ -267,6 +438,11 @@ struct token *lexer_next(struct lexer *lx)
     switch (read(lx)) {
     case -1:
         token_set(&lx->current, TOKEN_EOF);
+        break;
+
+    default:
+        lx->index--;
+        parse_identifier(lx);
         break;
 
 #define C(ch, token)                    \
