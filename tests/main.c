@@ -2,7 +2,17 @@
 
 int main(void)
 {
+    // Lexer
     test_declare(lexer_next_punctuation);
 
     test_declare(utf8_to_codepoint);
+
+    // String
+    test_declare(string_free);
+    test_declare(string_append_char);
+    test_declare(string_append_chars_n);
+    test_declare(string_reserve);
+    test_declare(string_ref);
+    test_declare(string_release);
+    test_declare(string_shrink);
 }
