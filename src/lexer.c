@@ -150,6 +150,95 @@ static int is_line_terminator(const char *bytes)
     }
 }
 
+// is_identifier_start()
+//
+// Checks if the current character is an identifier start. Returns the code
+// point of the character and writes its size in bytes to @size
+//
+// 12.7 Names and Keywords (https://tc39.es/ecma262/#sec-identifier-names)
+//   IdentifierStart ::
+//     IdentifierStartChar
+//     \ UnicodeEscapeSequence
+//
+//   IdentifierStartChar ::
+//     UnicodeIDStart       ; Any Unicode code point with the Unicode property "ID_Start"
+//     $
+//     _
+//
+// @bytes: UTF-8 encoded character
+// @size: Output to store the size of the character in bytes
+__attribute__((nonnull(1, 2)))
+static int is_identifier_start(const char *bytes, int *size)
+{
+    int cp;
+
+    if ((cp = bytes[0]) >= 0x80)
+        goto not_ascii;
+
+    // Todo: Add escape sequences
+    if (cp == '\\')
+        assert(0);
+
+    switch (cp) {
+    case '$':
+    case 'A' ... 'Z':
+    case '_':
+    case 'a' ... 'z':
+        *size = 1;
+        return cp;
+    }
+
+not_ascii:
+    if ((cp = utf8_to_codepoint(bytes, size)) == -1)
+        return -1;
+
+    return u_isIDStart(cp);
+}
+
+// is_identifier_part()
+//
+// Checks if the current character is an identifier part. Returns the code
+// point of the character and writes its size in bytes to @size
+//
+// 12.7 Names and Keywords (https://tc39.es/ecma262/#sec-identifier-names)
+//   IdentifierPart ::
+//     IdentifierPathChar
+//     \ UnicodeEscapeSequence
+//
+//   IdentifierPathChar ::
+//     UnicodeIDContinue    ; Any Unicode code point with the Unicode property "ID_Continue"
+//     $
+//
+// @bytes: UTF-8 encoded character
+// @size: Output to store the size of the character in bytes
+static int is_identifier_part(const char *bytes, int *size)
+{
+    int cp;
+
+    if ((cp = bytes[0]) >= 0x80)
+        goto not_ascii;
+
+    // Todo: Add escape sequences
+    if (cp == '\\')
+        assert(0);
+
+    switch (cp) {
+    case '$':
+    case '0' ... '9':
+    case 'A' ... 'Z':
+    case '_':
+    case 'a' ... 'z':
+        *size = 1;
+        return cp;
+    }
+
+not_ascii:
+    if ((cp = utf8_to_codepoint(bytes, size)) == -1)
+        return -1;
+
+    return u_isIDPart(cp);
+}
+
 static void skip_whitespace(struct lexer *lx)
 {
     while (is_whitespace(peek(lx)))
