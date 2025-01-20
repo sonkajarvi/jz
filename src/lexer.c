@@ -156,10 +156,102 @@ static int is_line_terminator(const char *bytes)
     }
 }
 
+__attribute__((const))
+static bool ishex(const char c)
+{
+    switch (c) {
+    case '0' ... '9':
+    case 'A' ... 'F':
+    case 'a' ... 'f':
+        return true;
+    }
+
+    return false;
+}
+
+__attribute__((const))
+static int hextoi(const char c)
+{
+    switch (c) {
+    case '0' ... '9':
+        return c - '0';
+    case 'A' ... 'F':
+        return c - 'A' + 10;
+    case 'a' ... 'f':
+        return c - 'a' + 10;
+    }
+
+    return -1;
+}
+
+// maybe_escape_sequence()
+//
+// Tries to parse an Unicode escape sequence from @bytes. Returns the bytes
+// traveled from @bytes, and writes the parsed code point to @cp
+//
+// https://tc39.es/ecma262/#prod-UnicodeEscapeSequence
+//
+//   UnicodeEscapeSequence ::
+//     u Hex4Digits
+//     u{ CodePoint }
+//
+//   Hex4Digits ::
+//     HexDigit HexDigit HexDigit HexDigit
+//
+//   HexDigit :: one of
+//     0 1 2 3 4 5 6 7 8 9 a b c d e f A B C D E F
+//
+//   CodePoint ::
+//     HexDigits            ; but only if the MV of HexDigits <= 0x10FFFF
+//
+//   HexDigits ::
+//     HexDigit
+//     HexDigits HexDigit
+//
+// @bytes: UTF-8 encoded character stream
+// @cp: Output to store the code point
+static int maybe_escape_sequence(const char *bytes, int *cp)
+{
+    static const int powers[] = {1048576, 65536, 4096, 256, 16, 1};
+    int i;
+
+    if (bytes[0] != 'u')
+        return 0;
+
+    *cp = 0;
+    if (bytes[1] != '{')
+        goto hex4digits;
+
+    // Count the hex digits in the sequence
+    for (i = 0; i < 6; i++) {
+        if (!ishex(bytes[2 + i]))
+            break;
+    }
+
+    // Atleast one hex digit is required, and the sequence must end with '}'
+    if (i == 0 || bytes[2 + i] != '}')
+        return 0;
+
+    // Calculate the value of the code point
+    for (int j = 0; j < i; j++)
+        *cp += hextoi(bytes[2 + j]) * powers[6 - i + j];
+
+    return i + 3; // + 3 for "u{}"
+
+hex4digits:
+    for (i = 0; i < 4; i++) {
+        if (!ishex(bytes[1 + i]))
+            return 0;
+        *cp += hextoi(bytes[1 + i]) * powers[2 + i];
+    }
+
+    return 5;
+}
+
 // is_identifier_start()
 //
-// Checks if the current character is an identifier start. Returns the code
-// point of the character and writes its size in bytes to @size
+// Checks if the current character is an identifier start. Returns the bytes
+// traveled from @bytes, and writes the encountered code point to @cp
 //
 // 12.7 Names and Keywords (https://tc39.es/ecma262/#sec-identifier-names)
 //   IdentifierStart ::
@@ -171,40 +263,46 @@ static int is_line_terminator(const char *bytes)
 //     $
 //     _
 //
-// @bytes: UTF-8 encoded character
-// @size: Output to store the size of the character in bytes
-__attribute__((nonnull(1, 2)))
-static int is_identifier_start(const char *bytes, int *size)
+// @bytes: UTF-8 encoded character stream
+// @cp: Output to store the code point
+static int is_identifier_start(const char *bytes, int *cp)
 {
-    int cp;
+    int t;
 
-    if ((cp = bytes[0]) >= 0x80)
+    if ((*cp = bytes[0]) == '\\') {
+        if ((t = maybe_escape_sequence(bytes + 1, cp)) == 0)
+            return 0;
+
+        t++; // Skip '\\'
+        goto end;
+    }
+
+    if (*cp >= 0x80)
         goto not_ascii;
 
-    // Todo: Add escape sequences
-    if (cp == '\\')
-        assert(0);
-
-    switch (cp) {
+    switch (*cp) {
     case '$':
     case 'A' ... 'Z':
     case '_':
     case 'a' ... 'z':
-        *size = 1;
-        return cp;
+        return 1;
     }
 
 not_ascii:
-    if ((cp = utf8_to_codepoint(bytes, size)) == -1)
-        return -1;
+    if ((*cp = utf8_to_codepoint(bytes, &t)) == -1)
+        return 0;
 
-    return u_isIDStart(cp);
+end:
+    if (!u_isIDStart(*cp))
+        return 0;
+
+    return t;
 }
 
 // is_identifier_part()
 //
-// Checks if the current character is an identifier part. Returns the code
-// point of the character and writes its size in bytes to @size
+// Checks if the current character is an identifier part. Returns the bytes
+// traveled from @bytes, and writes the encountered code point to @cp
 //
 // 12.7 Names and Keywords (https://tc39.es/ecma262/#sec-identifier-names)
 //   IdentifierPart ::
@@ -215,34 +313,41 @@ not_ascii:
 //     UnicodeIDContinue    ; Any Unicode code point with the Unicode property "ID_Continue"
 //     $
 //
-// @bytes: UTF-8 encoded character
-// @size: Output to store the size of the character in bytes
-static int is_identifier_part(const char *bytes, int *size)
+// @bytes: UTF-8 encoded character stream
+// @size: Output to store the code point
+static int is_identifier_part(const char *bytes, int *cp)
 {
-    int cp;
+    int t;
 
-    if ((cp = bytes[0]) >= 0x80)
+    if ((*cp = bytes[0]) == '\\') {
+        if ((t = maybe_escape_sequence(bytes + 1, cp)) == 0)
+            return 0;
+
+        t++; // Skip '\\'
+        goto end;
+    }
+
+    if (*cp >= 0x80)
         goto not_ascii;
 
-    // Todo: Add escape sequences
-    if (cp == '\\')
-        assert(0);
-
-    switch (cp) {
+    switch (*cp) {
     case '$':
     case '0' ... '9':
     case 'A' ... 'Z':
     case '_':
     case 'a' ... 'z':
-        *size = 1;
-        return cp;
+        return 1;
     }
 
 not_ascii:
-    if ((cp = utf8_to_codepoint(bytes, size)) == -1)
-        return -1;
+    if ((*cp = utf8_to_codepoint(bytes, &t)) == -1)
+        return 0;
 
-    return u_isIDPart(cp);
+end:
+    if (!u_isIDPart(*cp))
+        return 0;
+
+    return t;
 }
 
 // maybe_keyword()
@@ -378,22 +483,22 @@ static int maybe_keyword(const char *s)
 static int parse_identifier(struct lexer *lx)
 {
     struct string buf = {0};
-    int cp, size, type;
+    int cp, t, type;
 
     if (peek(lx) == '#') {
         string_append(&buf, '#');
         read(lx);
     }
 
-    if ((cp = is_identifier_start(lexer_position(lx), &size)) == -1) {
+    if ((t = is_identifier_start(lexer_position(lx), &cp)) == 0) {
         token_set(&lx->current, TOKEN_INVALID);
         return -1;
     }
 
     do {
         string_append_codepoint(&buf, cp);
-        lx->index += size;
-    } while ((cp = is_identifier_part(lexer_position(lx), &size)) != -1);
+        lx->index += t;
+    } while ((t = is_identifier_part(lexer_position(lx), &cp)) != 0);
 
     if ((type = maybe_keyword(string_ref(&buf))) != -1) {
         token_set(&lx->current, type);
