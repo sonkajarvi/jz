@@ -115,8 +115,10 @@ const char *string_ref(struct string *str)
         return NULL;
 
     // Add null terminator
-    if (str->capacity == str->length || str->data[str->length] > 0)
-        string_append(str, '\0');
+    if (str->capacity == str->length || str->data[str->length] != 0) {
+        string_append(str, 0);
+        str->length--;
+    }
 
     return str->data;
 }
@@ -127,8 +129,10 @@ char *string_release(struct string *str)
         return NULL;
 
     // Add null terminator
-    if (str->capacity == str->length || str->data[str->length] > 0)
-        string_append(str, '\0');
+    if (str->capacity == str->length || str->data[str->length] != 0) {
+        string_append(str, 0);
+        str->length--;
+    }
 
     char *tmp = str->data;
     memset(str, 0, sizeof(*str));
