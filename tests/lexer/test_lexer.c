@@ -1,16 +1,18 @@
+#include <stdio.h>
 #include <string.h>
 
 #include <jz/lexer.h>
 #include <jz/token.h>
 #include <test.h>
 
-// Asserts the next token is @expected, and EOF the one after that
+// Asserts that the next token is @expected, and EOF the one after that
 #define ASSERT_NEXT(lx, string, expected) {         \
     lexer_init(&lx, string, strlen(string));        \
-    test_assert(lexer_next(&lx)->type == expected); \
+    struct token *tk = lexer_next(&lx);             \
+    test_assert(tk->type == expected);              \
     test_assert(lexer_next(&lx)->type == TOKEN_EOF); }
 
-// Asserts the nexst token is an identifier with @expected as value,
+// Asserts that the next token is an identifier with @expected as value,
 // and EOF the one after that
 #define ASSERT_IDENTIFIER(lx, _string, expected) {  \
     lexer_init(&lx, _string, strlen(_string));      \
@@ -144,8 +146,17 @@ test_case(lexer_next_identifier)
 {
     struct lexer lx;
 
-    // Starts with keyword
+    // Starts with a keyword
     ASSERT_IDENTIFIER(lx, "constt", "constt");
+
+    // Escape sequences
+    ASSERT_IDENTIFIER(lx, "\\u0061", "a");
+    ASSERT_IDENTIFIER(lx, "\\u{62}", "b");
+    ASSERT_IDENTIFIER(lx, "\\u{063}", "c");
+    ASSERT_IDENTIFIER(lx, "\\u{0064}", "d");
+    ASSERT_IDENTIFIER(lx, "\\u{00065}", "e");
+    ASSERT_IDENTIFIER(lx, "\\u{000066}", "f");
+    ASSERT_IDENTIFIER(lx, "t\\u{65}st", "test");
 
     test_success();
 }
