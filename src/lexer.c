@@ -93,21 +93,14 @@ int utf8_to_codepoint(const char *bytes, int *size)
     return -1;
 }
 
-
-// is_whitespace()
+// https://tc39.es/ecma262/#prod-WhiteSpace
 //
-// Checks if the current character is a whitespace character.
-// Returns the size of the character in bytes, or zero if not whitespace
-//
-// 12.2 White Space (https://tc39.es/ecma262/#sec-white-space)
 //   Whitespace ::
 //     <TAB>            ; Character tabulation
 //     <VT>             ; Line tabulation
 //     <FF>             ; Form feed
 //     <ZWNBSP>         ; Zero width no-break space
 //     <USP>            ; Any code point in general category "Space_Separator"
-//
-// @bytes: UTF-8 encoded character
 static int is_whitespace(const char *bytes)
 {
     int c, size;
@@ -122,19 +115,13 @@ static int is_whitespace(const char *bytes)
     return c == 0xffef || u_isUWhiteSpace(c);
 }
 
-// is_line_terminator()
+// https://tc39.es/ecma262/#prod-LineTerminator
 //
-// Checks if the current character is a line terminator. Returns the size of
-// the character in bytes, or zero if not a line terminator
-//
-// 12.3 Line Terminators (https://tc39.es/ecma262/#sec-line-terminators)
 //   LineTerminator ::
 //     <LF>             ; Line feed
 //     <CR>             ; Carriage return
 //     <LS>             ; Line separator
 //     <PS>             ; Paragraph separator
-//
-// @bytes: UTF-8 encoded character
 static int is_line_terminator(const char *bytes)
 {
     int c, size;
@@ -184,11 +171,6 @@ static int hextoi(const char c)
     return -1;
 }
 
-// maybe_escape_sequence()
-//
-// Tries to parse an Unicode escape sequence from @bytes. Returns the bytes
-// traveled from @bytes, and writes the parsed code point to @cp
-//
 // https://tc39.es/ecma262/#prod-UnicodeEscapeSequence
 //
 //   UnicodeEscapeSequence ::
@@ -207,9 +189,6 @@ static int hextoi(const char c)
 //   HexDigits ::
 //     HexDigit
 //     HexDigits HexDigit
-//
-// @bytes: UTF-8 encoded character stream
-// @cp: Output to store the code point
 static int maybe_escape_sequence(const char *bytes, int *cp)
 {
     static const int powers[] = {1048576, 65536, 4096, 256, 16, 1};
@@ -248,12 +227,8 @@ hex4digits:
     return 5;
 }
 
-// is_identifier_start()
+// https://tc39.es/ecma262/#prod-IdentifierStart
 //
-// Checks if the current character is an identifier start. Returns the bytes
-// traveled from @bytes, and writes the encountered code point to @cp
-//
-// 12.7 Names and Keywords (https://tc39.es/ecma262/#sec-identifier-names)
 //   IdentifierStart ::
 //     IdentifierStartChar
 //     \ UnicodeEscapeSequence
@@ -262,9 +237,6 @@ hex4digits:
 //     UnicodeIDStart       ; Any Unicode code point with the Unicode property "ID_Start"
 //     $
 //     _
-//
-// @bytes: UTF-8 encoded character stream
-// @cp: Output to store the code point
 static int is_identifier_start(const char *bytes, int *cp)
 {
     int t;
@@ -299,12 +271,8 @@ end:
     return t;
 }
 
-// is_identifier_part()
+// https://tc39.es/ecma262/#prod-IdentifierPart
 //
-// Checks if the current character is an identifier part. Returns the bytes
-// traveled from @bytes, and writes the encountered code point to @cp
-//
-// 12.7 Names and Keywords (https://tc39.es/ecma262/#sec-identifier-names)
 //   IdentifierPart ::
 //     IdentifierPathChar
 //     \ UnicodeEscapeSequence
@@ -312,9 +280,6 @@ end:
 //   IdentifierPathChar ::
 //     UnicodeIDContinue    ; Any Unicode code point with the Unicode property "ID_Continue"
 //     $
-//
-// @bytes: UTF-8 encoded character stream
-// @size: Output to store the code point
 static int is_identifier_part(const char *bytes, int *cp)
 {
     int t;
@@ -350,11 +315,6 @@ end:
     return t;
 }
 
-// maybe_keyword()
-//
-// Returns the corresponding token type for a keyword, or -1
-//
-// @s: String to check
 static int maybe_keyword(const char *s)
 {
 #define C(str, tok) \
@@ -466,20 +426,14 @@ static int maybe_keyword(const char *s)
     return -1;
 }
 
-// parse_identifier()
+// https://tc39.es/ecma262/#sec-identifier-names
 //
-// Parses (private) identifiers and stores its name in the identifier
-// token. If its a known keyword, the corresponding token is used instead
-//
-// 12.7 Names and Keywords (https://tc39.es/ecma262/#sec-identifier-names)
 //   PrivateIdentifier ::
 //     # IdentifierName
 //
 //   IdentifierName ::
 //     IdentifierStart
 //     IdentifierName IdentifierPart
-//
-// @lx: Pointer to the lexer
 static int parse_identifier(struct lexer *lx)
 {
     struct string buf = {0};
