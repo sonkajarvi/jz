@@ -8,9 +8,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_library(jz
     src/lexer.c
-    # parser.c
+    src/lexer-util.c
     src/token.c
-
     src/string.c
 )
 
