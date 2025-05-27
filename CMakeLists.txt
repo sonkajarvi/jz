@@ -10,7 +10,6 @@ add_library(jz
     src/lexer.c
     src/lexer-util.c
     src/token.c
-    src/string.c
 )
 
 target_include_directories(jz PUBLIC

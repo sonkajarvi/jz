@@ -10,8 +10,6 @@ add_executable(tests
     main.c
 
     lexer/test_lexer.c
-
-    string/test_string.c
 )
 
 if (EXIT_ON_FAILURE)
