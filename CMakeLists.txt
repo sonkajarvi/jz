@@ -1,19 +1,13 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(jz)
+project(jz LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_library(jz
-    src/lexer.c
-    src/lexer-util.c
-    src/token.c
-)
-
-target_include_directories(jz PUBLIC
-    include
+    tokenizer.c
 )
 
 find_package(ICU REQUIRED COMPONENTS uc)
@@ -21,6 +15,7 @@ target_link_libraries(jz PRIVATE
     ICU::uc
 )
 
+# TODO: Separate to debug and non-debug options
 target_compile_options(jz PRIVATE
     -g
     -O3
@@ -28,6 +23,7 @@ target_compile_options(jz PRIVATE
     -Wextra
     -Werror
     -Wstrict-prototypes
+    -Wno-trigraphs
 )
 
 add_subdirectory(tests)
