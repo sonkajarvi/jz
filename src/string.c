@@ -1,9 +1,3 @@
-//
-// Copyright (c) 2024-2025, sonkajarvi
-//
-// SPDX-License-Identifier: MIT
-//
-
 #include <stdlib.h>
 #include <string.h>
 

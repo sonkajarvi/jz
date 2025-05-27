@@ -1,9 +1,3 @@
-//
-// Copyright (c) 2024-2025, sonkajarvi
-//
-// SPDX-License-Identifier: MIT
-//
-
 #ifndef JZ_STRING_H
 #define JZ_STRING_H
 

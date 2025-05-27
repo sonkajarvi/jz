@@ -1,9 +1,3 @@
-//
-// Copyright (c) 2025, sonkajarvi
-//
-// SPDX-License-Identifier: MIT
-//
-
 #ifndef TEST_H
 #define TEST_H
 
