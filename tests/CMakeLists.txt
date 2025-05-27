@@ -7,19 +7,12 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_executable(tests
-    main.c
-
-    lexer/test_lexer.c
+    test.c
+    test_tokenizer.c
 )
 
-if (EXIT_ON_FAILURE)
-    target_compile_definitions(tests PRIVATE
-        TEST_EXIT_ON_FAILURE
-    )
-endif()
-
 target_include_directories(tests PRIVATE
-    .
+    ..
 )
 
 target_link_libraries(tests PRIVATE
