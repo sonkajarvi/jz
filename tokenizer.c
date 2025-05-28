@@ -129,6 +129,11 @@ static bool is_whitespace(const int cp)
         || u_isUWhiteSpace(cp);
 }
 
+int read_numeric_literal(struct context *ctx, struct token *tok)
+{
+    return 0;
+}
+
 int next_token(struct context *ctx, struct token *tok)
 {
     assert(ctx && ctx->bytes);
@@ -145,7 +150,7 @@ int next_token(struct context *ctx, struct token *tok)
 
     case '0' ... '9':
         // TODO: Implement parse_numeric_literal
-        return -1;
+        return read_numeric_literal(ctx, tok);
 
     case '"':
     case '\'':
