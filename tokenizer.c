@@ -111,7 +111,7 @@ static uint32_t read_codepoint(struct context *ctx)
     return c;
 }
 
-// https://tc39.es/ecma262/#sec-white-space
+// https://tc39.es/ecma262/#prod-WhiteSpace
 //
 //   Whitespace ::
 //     <TAB>                ; Character tabulation
@@ -127,6 +127,30 @@ static bool is_whitespace(const int cp)
         || cp == '\f'
         || cp == 0xfeff
         || u_isUWhiteSpace(cp);
+}
+
+// https://tc39.es/ecma262/#prod-IdentifierStart
+//
+//   IdentifierStart ::
+//     UnicodeIDStart       ; Any code point with the property "ID_Start"
+//     $
+//     _
+static bool is_identifier_start(const uint32_t cp)
+{
+    return cp == '$'
+        || cp == '_'
+        || u_isIDStart(cp);
+}
+
+// https://tc39.es/ecma262/#prod-IdentifierPart
+//
+//   IdentifierPart ::
+//     UnicodeIDContinue    ; Any code point with the property "ID_Continue"
+//     $
+static bool is_identifier_part(const uint32_t cp)
+{
+    return cp == '$'
+        || u_isIDPart(cp);
 }
 
 int next_token(struct context *ctx, struct token *tok)

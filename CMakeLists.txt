@@ -15,7 +15,6 @@ target_link_libraries(jz PRIVATE
     ICU::uc
 )
 
-# TODO: Separate to debug and non-debug options
 target_compile_options(jz PRIVATE
     -g
     -O3
