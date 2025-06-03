@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <ctype.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -8,6 +9,7 @@
 
 #include "token.h"
 #include "tokenizer.h"
+#include "vec.h"
 
 static const char *token_strings[] = {
 #define F(x) #x,
@@ -21,12 +23,21 @@ static uint32_t peek_offset(struct context *ctx, const size_t offset)
 
     if (ctx->index + offset >= ctx->size)
         return -1;
-    return ctx->bytes[ctx->index];
+    return ctx->bytes[ctx->index + offset];
 }
 
 static uint32_t peek(struct context *ctx)
 {
     return peek_offset(ctx, 0);
+}
+
+static uint32_t read(struct context *ctx)
+{
+    uint32_t c;
+    if ((c = peek(ctx)) == (uint32_t)-1)
+        return -1;
+    ctx->index++;
+    return c;
 }
 
 static uint32_t utf8_to_codepoint(const uint8_t *bytes, int *size)
@@ -100,10 +111,8 @@ static uint32_t read_codepoint(struct context *ctx)
     int size;
 
     // Character is ASCII
-    if (peek(ctx) < 0x80) {
-        ctx->index++;
-        return peek(ctx);
-    }
+    if (peek(ctx) < 0x80)
+        return read(ctx);
 
     if ((c = utf8_to_codepoint(ctx->bytes, &size)))
         return -1;
@@ -153,6 +162,167 @@ static bool is_identifier_part(const uint32_t cp)
         || u_isIDPart(cp);
 }
 
+// TODO: Return a status code
+static void push_codepoint(uint8_t **buf, uint32_t cp)
+{
+    if (cp <= 0x7f) {
+        vec_push(*buf, cp);
+    } else if (cp <= 0x7ff) {
+        vec_push(*buf, ((cp >> 6) & 0x1f) | 0xc0);
+        vec_push(*buf, (cp        & 0x3f) | 0x80);
+    } else if (cp <= 0xffff) {
+        vec_push(*buf, ((cp >> 12) & 0x0f) | 0xe0);
+        vec_push(*buf, ((cp >> 6)  & 0x3f) | 0x80);
+        vec_push(*buf, (cp         & 0x3f) | 0x80);
+    } else if (cp <= 0x10ffff) {
+        vec_push(*buf, ((cp >> 18) & 0x07) | 0xf0);
+        vec_push(*buf, ((cp >> 12) & 0x3f) | 0x80);
+        vec_push(*buf, ((cp >> 6)  & 0x3f) | 0x80);
+        vec_push(*buf, (cp         & 0x3f) | 0x80);
+    }
+}
+
+bool ishex(const uint32_t c)
+{
+    switch (c) {
+    case '0' ... '9':
+    case 'A' ... 'F':
+    case 'a' ... 'f':
+        return true;
+
+    default:
+        return false;
+    }
+}
+
+uint32_t hextoi(const uint32_t c)
+{
+    switch (c) {
+    case '0' ... '9':
+        return c - '0';
+
+    case 'A' ... 'F':
+        return c - 'A' + 10;
+
+    case 'a' ... 'f':
+        return c - 'a' + 10;
+
+    default:
+        return -1;
+    }
+}
+
+// https://tc39.es/ecma262/#prod-UnicodeEscapeSequence
+//
+//   UnicodeEscapeSequence ::
+//     u Hex4Digits
+//     u{ CodePoint }
+//
+//   CodePoint ::
+//     HexDigits                ; but only if the MV of HexDigits <= 0x10ffff
+static uint32_t read_escape_sequence(struct context *ctx)
+{
+    static const uint32_t powers[] = {65536, 4096, 256, 16, 1};
+    size_t cnt;
+    uint32_t cp;
+
+    if (read(ctx) != 'u')
+        return -1;
+
+    if (peek(ctx) == '{') {
+        read(ctx);
+
+        // Skip any leading zeroes
+        while (peek(ctx) == '0')
+            read(ctx);
+
+        cnt = 0;
+        while (ishex(peek_offset(ctx, cnt)))
+            cnt++;
+
+        // Count can only be between one and six
+        if (cnt == 0 || cnt > 6 || peek_offset(ctx, cnt) != '}')
+            return -1;
+
+        cp = 0;
+        if (cnt == 6) {
+            cp = 1048576; // 1 * 16 ^ 5
+            read(ctx);
+            cnt--;
+        }
+
+        for (size_t i = 0; i < cnt; i++) {
+            // printf("%c\n", peek(ctx));
+            cp += hextoi(read(ctx)) * powers[5 - cnt + i];
+        }
+        read(ctx);
+    } else {
+        cp = 0;
+        for (size_t i = 0; i < 4; i++) {
+            if (!ishex(peek(ctx)))
+                return -1;
+            cp += hextoi(read(ctx)) * powers[1 + i];
+        }
+    }
+
+    if (cp > 0x10ffff)
+        return -1;
+    return cp;
+}
+
+// https://tc39.es/ecma262/#prod-IdentifierName
+//
+//   PrivateIdentifier ::
+//     # IdentifierName
+//
+//   IdentifierName ::
+//     IdentifierStart
+//     IdentifierName IdentifierPart
+static int read_identifier_name(struct context *ctx, struct token *tok)
+{
+    uint8_t *buf = NULL;
+    uint32_t cp;
+
+    // Include # for private identifiers
+    if (peek(ctx) == '#')
+        vec_push(buf, read(ctx));
+
+    if (peek(ctx) == '\\') {
+        read(ctx);
+        if ((cp = read_escape_sequence(ctx)) == (uint32_t)-1)
+            return -1;
+    } else {
+        cp = read_codepoint(ctx);
+    }
+
+    if (!is_identifier_start(cp))
+        return -1;
+    push_codepoint(&buf, cp);
+
+    for (;;) {
+        if (peek(ctx) == '\\') {
+            read(ctx);
+            if ((cp = read_escape_sequence(ctx)) == (uint32_t)-1)
+                return -1;
+        } else {
+            cp = peek_codepoint(ctx);
+        }
+
+        if (!is_identifier_part(cp))
+            break;
+
+        push_codepoint(&buf, cp);
+        read_codepoint(ctx);
+    }
+
+    vec_push(buf, 0);
+    tok->type = TOKEN_IDENTIFIER;
+    tok->id.str = buf;
+    tok->id.len = vec_len(buf);
+
+    return 0;
+}
+
 int next_token(struct context *ctx, struct token *tok)
 {
     assert(ctx && ctx->bytes);
@@ -181,8 +351,7 @@ int next_token(struct context *ctx, struct token *tok)
         return -1;
 
     default:
-        // TODO: Implement parse_identifier
-        return -1;
+        return read_identifier_name(ctx, tok);
 
 #define F(c, type_)        \
     case c:                \
@@ -337,5 +506,12 @@ int next_token(struct context *ctx, struct token *tok)
 void print_token(struct token *tok)
 {
     assert(tok && tok->type < TOKEN_COUNT);
-    printf("%s\n", token_strings[tok->type]);
+
+    printf("%s ", token_strings[tok->type]);
+    switch (tok->type) {
+    case TOKEN_IDENTIFIER:
+        fwrite(tok->id.str, 1, tok->id.len, stdout);
+        break;
+    }
+    printf("\n");
 }
