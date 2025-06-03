@@ -17,6 +17,7 @@ static const char *token_strings[] = {
 #undef F
 };
 
+__attribute__((__warn_unused_result__))
 static uint32_t peek_offset(struct context *ctx, const size_t offset)
 {
     assert(ctx && ctx->bytes);
@@ -26,6 +27,7 @@ static uint32_t peek_offset(struct context *ctx, const size_t offset)
     return ctx->bytes[ctx->index + offset];
 }
 
+__attribute__((__warn_unused_result__))
 static uint32_t peek(struct context *ctx)
 {
     return peek_offset(ctx, 0);
@@ -90,7 +92,7 @@ static uint32_t utf8_to_codepoint(const uint8_t *bytes, int *size)
     return -1;
 }
 
-__attribute__((unused))
+__attribute__((__warn_unused_result__))
 static uint32_t peek_codepoint(struct context *ctx)
 {
     uint32_t c;
@@ -99,12 +101,11 @@ static uint32_t peek_codepoint(struct context *ctx)
     if (peek(ctx) < 0x80)
         return peek(ctx);
 
-    if ((c = utf8_to_codepoint(ctx->bytes, NULL)))
+    if ((c = utf8_to_codepoint(&ctx->bytes[ctx->index], NULL)) == (uint32_t)-1)
         return -1;
     return c;
 }
 
-__attribute__((unused))
 static uint32_t read_codepoint(struct context *ctx)
 {
     uint32_t c;
@@ -114,7 +115,7 @@ static uint32_t read_codepoint(struct context *ctx)
     if (peek(ctx) < 0x80)
         return read(ctx);
 
-    if ((c = utf8_to_codepoint(ctx->bytes, &size)))
+    if ((c = utf8_to_codepoint(&ctx->bytes[ctx->index], &size)) == (uint32_t)-1)
         return -1;
     ctx->index += size;
     return c;
