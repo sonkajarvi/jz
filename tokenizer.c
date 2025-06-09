@@ -1,5 +1,4 @@
 #include <assert.h>
-#include <ctype.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -7,9 +6,9 @@
 
 #include <unicode/uchar.h>
 
+#include "str.h"
 #include "token.h"
 #include "tokenizer.h"
-#include "vec.h"
 
 static const char *token_strings[] = {
 #define F(x) #x,
@@ -163,26 +162,6 @@ static bool is_identifier_part(const uint32_t cp)
         || u_isIDPart(cp);
 }
 
-// TODO: Return a status code
-static void push_codepoint(uint8_t **buf, uint32_t cp)
-{
-    if (cp <= 0x7f) {
-        vec_push(*buf, cp);
-    } else if (cp <= 0x7ff) {
-        vec_push(*buf, ((cp >> 6) & 0x1f) | 0xc0);
-        vec_push(*buf, (cp        & 0x3f) | 0x80);
-    } else if (cp <= 0xffff) {
-        vec_push(*buf, ((cp >> 12) & 0x0f) | 0xe0);
-        vec_push(*buf, ((cp >> 6)  & 0x3f) | 0x80);
-        vec_push(*buf, (cp         & 0x3f) | 0x80);
-    } else if (cp <= 0x10ffff) {
-        vec_push(*buf, ((cp >> 18) & 0x07) | 0xf0);
-        vec_push(*buf, ((cp >> 12) & 0x3f) | 0x80);
-        vec_push(*buf, ((cp >> 6)  & 0x3f) | 0x80);
-        vec_push(*buf, (cp         & 0x3f) | 0x80);
-    }
-}
-
 bool ishex(const uint32_t c)
 {
     switch (c) {
@@ -213,6 +192,16 @@ uint32_t hextoi(const uint32_t c)
     }
 }
 
+bool isoct(const uint32_t cp)
+{
+    return cp >= '0' && cp <= '7';
+}
+
+uint32_t octoi(const uint32_t cp)
+{
+    return cp - '0';
+}
+
 // https://tc39.es/ecma262/#prod-UnicodeEscapeSequence
 //
 //   UnicodeEscapeSequence ::
@@ -221,7 +210,7 @@ uint32_t hextoi(const uint32_t c)
 //
 //   CodePoint ::
 //     HexDigits                ; but only if the MV of HexDigits <= 0x10ffff
-static uint32_t read_escape_sequence(struct context *ctx)
+static uint32_t read_unicode_escape_sequence(struct context *ctx)
 {
     static const uint32_t powers[] = {65536, 4096, 256, 16, 1};
     size_t cnt;
@@ -252,10 +241,8 @@ static uint32_t read_escape_sequence(struct context *ctx)
             cnt--;
         }
 
-        for (size_t i = 0; i < cnt; i++) {
-            // printf("%c\n", peek(ctx));
+        for (size_t i = 0; i < cnt; i++)
             cp += hextoi(read(ctx)) * powers[5 - cnt + i];
-        }
         read(ctx);
     } else {
         cp = 0;
@@ -281,16 +268,18 @@ static uint32_t read_escape_sequence(struct context *ctx)
 //     IdentifierName IdentifierPart
 static int read_identifier_name(struct context *ctx, struct token *tok)
 {
-    uint8_t *buf = NULL;
+    struct string str;
     uint32_t cp;
 
+    string_init(&str);
+
     // Include # for private identifiers
-    if (peek(ctx) == '#')
-        vec_push(buf, read(ctx));
+    if (peek_codepoint(ctx) == '#')
+        string_push_codepoint(&str, read_codepoint(ctx));
 
     if (peek(ctx) == '\\') {
         read(ctx);
-        if ((cp = read_escape_sequence(ctx)) == (uint32_t)-1)
+        if ((cp = read_unicode_escape_sequence(ctx)) == (uint32_t)-1)
             return -1;
     } else {
         cp = read_codepoint(ctx);
@@ -298,12 +287,12 @@ static int read_identifier_name(struct context *ctx, struct token *tok)
 
     if (!is_identifier_start(cp))
         return -1;
-    push_codepoint(&buf, cp);
+    string_push_codepoint(&str, cp);
 
     for (;;) {
         if (peek(ctx) == '\\') {
             read(ctx);
-            if ((cp = read_escape_sequence(ctx)) == (uint32_t)-1)
+            if ((cp = read_unicode_escape_sequence(ctx)) == (uint32_t)-1)
                 return -1;
         } else {
             cp = peek_codepoint(ctx);
@@ -312,15 +301,182 @@ static int read_identifier_name(struct context *ctx, struct token *tok)
         if (!is_identifier_part(cp))
             break;
 
-        push_codepoint(&buf, cp);
+        // push_codepoint(&buf, cp);
+        string_push_codepoint(&str, cp);
         read_codepoint(ctx);
     }
 
-    vec_push(buf, 0);
     tok->type = TOKEN_IDENTIFIER;
-    tok->id.str = buf;
-    tok->id.len = vec_len(buf);
+    tok->str = str;
+    return 0;
+}
 
+// https://tc39.es/ecma262/#prod-EscapeSequence
+//
+//   EscapeSequence ::
+//     CharacterEscapeSequence
+//     0 [lookahead != DecimalDigit]
+//     LegacyOctalEscapeSequence
+//     NonOctalDecimalEscapeSequence
+//     HexEscapeSequence
+//     UnicodeEscapeSequence
+//
+//   CharacterEscapeSequence ::
+//     SingleEscapeCharacter
+//     SourceCharacter          ; but not one of EscapeCharacter or LineTerminator
+//
+//   SingleEscapeCharacter :: one of
+//     ' " \ b f n r t v
+//
+//   EscapeCharacter ::
+//     SingleEscapeCharacter
+//     DecimalDigit
+//     x
+//     u
+//
+//   LegacyOctalEscapeSequence ::
+//     0 [lookahead == {8, 9}]
+//     NonZeroOctalDigit [lookahead != OctalDigit]
+//     ZeroToThree OctalDigit [lookahead != OctalDigit]
+//     FourToSeven OctalDigit
+//     ZeroToThree OctalDigit OctalDigit
+//
+//   NonOctalDecimalEscapeSequence :: one of
+//     8 9
+//
+//   HexEscapeSequence ::
+//     x HexDigit HexDigit
+static uint32_t read_escape_sequence(struct context *ctx)
+{
+    uint32_t cp, cp2;
+
+    switch ((cp = peek_codepoint(ctx))) {
+    // Character escape sequence,
+    // non-octal decimal escape sequence
+    default:
+        break;
+
+    // Single escape character
+    case '\'':
+    case '"':
+    case '\\':
+        break;
+    case 'b': cp = '\b'; break;
+    case 'f': cp = '\f'; break;
+    case 'n': cp = '\n'; break;
+    case 'r': cp = '\r'; break;
+    case 't': cp = '\t'; break;
+    case 'v': cp = '\v'; break;
+
+    // Legacy octal escape sequence
+    case '0' ... '7':
+        read_codepoint(ctx);
+        if (!isoct(peek(ctx)))
+            return octoi(cp);
+        cp2 = read(ctx);
+        if (!isoct(peek(ctx)) || octoi(cp) >= 4)
+            return octoi(cp) * 8 + octoi(cp2);
+        return octoi(cp) * 64 + octoi(cp2) * 8 + octoi(read(ctx));
+
+    // Hex escape sequence
+    case 'x':
+        read_codepoint(ctx);
+        if ((cp = read_codepoint(ctx)) == (uint32_t)-1 || !ishex(cp))
+            return -1;
+        if ((cp2 = read_codepoint(ctx)) == (uint32_t)-1 || !ishex(cp2))
+            return -1;
+        return hextoi(cp) * 16 + hextoi(cp2);
+
+    case 'u':
+        return read_unicode_escape_sequence(ctx);
+    }
+
+    read_codepoint(ctx);
+    return cp;
+}
+
+// https://tc39.es/ecma262/#prod-DoubleStringCharacter
+//
+//   DoubleStringCharacter ::
+//     SourceCharacter          ; but not one of " or \ or LineTerminator
+//     <LS>                     ; Line separator
+//     <PS>                     ; Paragraph separator
+//
+//   SingleStringCharacter ::
+//     SourceCharacter          ; but not one of ' or \ or LineTerminator
+//     <LS>
+//     <PS>
+static bool is_string_character(const uint32_t cp, const bool is_single)
+{
+    uint32_t delim = '"';
+    if (is_single)
+        delim = '\'';
+    return cp <= 0x10ffff && cp != '\n' && cp != '\r' && cp != delim && cp != '\\';
+}
+
+// https://tc39.es/ecma262/#prod-StringLiteral
+//
+//   StringLiteral ::
+//     " DoubleStringCharacters_opt "
+//     ' SingleStringCharacters_opt '
+//
+//   LineContinuation ::
+//     \ LineTerminatorSequence
+//
+//   LineTerminatorSequence ::
+//     <LF>                     ; Line feed
+//     <CR> [lookahead != <LF>] ; Carriage return
+//     <LS>                     ; Line separator
+//     <PS>                     ; Paragraph separator
+//     <CR> <LF>
+static int read_string_literal(struct context *ctx, struct token *tok, const bool is_single)
+{
+    struct string str;
+    uint32_t cp;
+
+    string_init(&str);
+
+    if (peek(ctx) != (is_single ? '\'' : '"'))
+        return -1;
+    read(ctx);
+
+loop:
+    for (;;) {
+        if (peek(ctx) == (is_single ? '\'' : '"')) {
+            // printf("end\n");
+            read(ctx);
+            break;
+        } else if (peek(ctx) == '\\') {
+            read(ctx);
+
+            switch (peek_codepoint(ctx)) {
+            case '\n':
+            case '\r':
+            case 0x2028:
+            case 0x2029:
+                read_codepoint(ctx);
+                if (peek(ctx) == '\n')
+                    read(ctx);
+                goto loop;
+
+            default:
+                if ((cp = read_escape_sequence(ctx)) == (uint32_t)-1)
+                    return -1;
+            }
+        } else {
+            if ((cp = peek_codepoint(ctx)) == (uint32_t)-1)
+                return -1;
+            if (!is_string_character(cp, is_single))
+                break;
+
+            read_codepoint(ctx);
+        }
+
+        string_push_codepoint(&str, cp);
+    }
+
+    tok->type = TOKEN_STRING_LITERAL;
+    tok->str = str;
     return 0;
 }
 
@@ -344,8 +500,7 @@ int next_token(struct context *ctx, struct token *tok)
 
     case '"':
     case '\'':
-        // TODO: Implement parse_string_literal
-        return -1;
+        return read_string_literal(ctx, tok, peek(ctx) == '\'');
 
     case '`':
         // TODO: Implement parse_template_literal
@@ -511,7 +666,8 @@ void print_token(struct token *tok)
     printf("%s ", token_strings[tok->type]);
     switch (tok->type) {
     case TOKEN_IDENTIFIER:
-        fwrite(tok->id.str, 1, tok->id.len, stdout);
+    case TOKEN_STRING_LITERAL:
+        // fwrite(tok->str, 1, tok->len, stdout);
         break;
     }
     printf("\n");

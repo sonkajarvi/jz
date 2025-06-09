@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "str.h"
+
 #define TOKEN_LIST(F) \
     F(AMPERSAND)                      /* & */ \
     F(AMPERSAND_AMPERSAND)            /* && */ \
@@ -150,11 +152,7 @@ enum token_type
 struct token
 {
     int type;
-
-    struct {
-        uint8_t *str;
-        size_t len;
-    } id;
+    struct string str;
 };
 
 #endif // TOKEN_H_
