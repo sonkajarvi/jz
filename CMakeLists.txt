@@ -8,6 +8,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_library(jz
     tokenizer.c
+    str.c
 )
 
 find_package(ICU REQUIRED COMPONENTS uc)
