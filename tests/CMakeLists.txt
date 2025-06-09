@@ -9,6 +9,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_executable(tests
     test.c
     test_tokenizer.c
+    test_str.c
 )
 
 target_include_directories(tests PRIVATE
