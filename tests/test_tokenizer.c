@@ -1,5 +1,6 @@
 #include <string.h>
 
+#include <str.h>
 #include <token.h>
 #include <tokenizer.h>
 #include <vec.h>
@@ -15,16 +16,32 @@
     ASSERT_EQ(next_token(&ctx, &tok), 0); \
     ASSERT_EQ(tok.type, expected); } while (0)
 
-#define ASSERT_IDENTIFIER(str_, expected) do {              \
-    struct context ctx;                                     \
-    struct token tok;                                       \
-    ctx.bytes = (void *)str_;                               \
-    ctx.size = strlen(str_);                                \
-    ctx.index = 0;                                          \
-    ASSERT_EQ(next_token(&ctx, &tok), 0);                   \
-    ASSERT_EQ(tok.type, TOKEN_IDENTIFIER);                  \
-    ASSERT_EQ(memcmp(tok.id.str, expected, tok.id.len), 0); \
-    vec_free(tok.id.str); } while (0)
+#define ASSERT_IDENTIFIER(src, expected) do { \
+    struct context ctx;                       \
+    struct token tok;                         \
+    struct string str;                        \
+    ctx.bytes = (void *)src;                  \
+    ctx.size = strlen(src);                   \
+    ctx.index = 0;                            \
+    ASSERT_EQ(next_token(&ctx, &tok), 0);     \
+    ASSERT_EQ(tok.type, TOKEN_IDENTIFIER);    \
+    S(&str, expected);                        \
+    ASSERT_EQ(string_eq(&tok.str, &str), 1);  \
+    string_free(&str); } while (0)
+
+#define ASSERT_STRING(src, expected) do {      \
+    struct context ctx;                        \
+    struct token tok;                          \
+    struct string str;                         \
+    ctx.bytes = (void *)src;                   \
+    ctx.size = strlen(src);                    \
+    ctx.index = 0;                             \
+    ASSERT_EQ(next_token(&ctx, &tok), 0);      \
+    ASSERT_EQ(tok.type, TOKEN_STRING_LITERAL); \
+    S(&str, expected);                         \
+    ASSERT_EQ(string_eq(&tok.str, &str), 1);   \
+    string_free(&tok.str);                     \
+    string_free(&str); } while (0)
 
 TEST(tokenizer_next_token_eof)
 {
@@ -155,4 +172,56 @@ TEST(tokenizer_next_token_identifier)
 
     ASSERT_IDENTIFIER("a\\u0061", "aa");
     ASSERT_IDENTIFIER("a\\u{61}", "aa");
+}
+
+// https://www.cogsci.ed.ac.uk/~richard/utf-8.cgi
+TEST(tokenizer_next_token_string)
+{
+    ASSERT_STRING("\"\"", "");
+    ASSERT_STRING("\'\'", "");
+
+    ASSERT_STRING("\"'\"", "'");
+    ASSERT_STRING("'\"'", "\"");
+
+    ASSERT_STRING("\"\x61\"", "a");
+    ASSERT_STRING("\"\xc2\xa2\"", "¢");
+    ASSERT_STRING("\"\xe2\x82\xac\"", "€");
+    ASSERT_STRING("\"\xf0\x9f\x9e\x85\"", "🞅");
+
+    // Line terminators
+    ASSERT_STRING("\"a\\\na\"", "aa");
+    ASSERT_STRING("\"a\\\ra\"", "aa");
+    ASSERT_STRING("\"a\\\xe2\x80\xa8g\"", "ag"); // <LS>
+    ASSERT_STRING("\"a\\\xe2\x80\xa9g\"", "ag"); // <PS>
+    ASSERT_STRING("\"a\\\r\na\"", "aa");
+
+    // Character escape sequences
+    ASSERT_STRING("\"a\\'a\"", "a'a");
+    ASSERT_STRING("\"a\\\"a\"", "a\"a");
+    ASSERT_STRING("\"a\\\\a\"", "a\\a");
+    ASSERT_STRING("\"a\\ba\"", "a\ba");
+    ASSERT_STRING("\"a\\fa\"", "a\fa");
+    ASSERT_STRING("\"a\\na\"", "a\na");
+    ASSERT_STRING("\"a\\ra\"", "a\ra");
+    ASSERT_STRING("\"a\\ta\"", "a\ta");
+    ASSERT_STRING("\"a\\va\"", "a\va");
+
+    // Legacy octal escape sequence
+    ASSERT_STRING("\"\\7\"", "\x07");
+    ASSERT_STRING("\"\\07\"", "\x07");
+    ASSERT_STRING("\"\\077\"", "?");
+    ASSERT_STRING("\"\\777\"", "?7");
+
+    // Non-octal decimal escape sequence
+    ASSERT_STRING("\"\\8\"", "8");
+    ASSERT_STRING("\"\\9\"", "9");
+
+    // Hex escape sequence
+    ASSERT_STRING("\"\\x3f\"", "?");
+    ASSERT_STRING("\"\\x3F\"", "?");
+
+    // Unicode escape sequence
+    ASSERT_STRING("\"a\\u0062c\"", "abc");
+    ASSERT_STRING("\"a\\u{62}c\"", "abc");
+    ASSERT_STRING("\"a\\u{0000000062}c\"", "abc");
 }
