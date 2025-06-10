@@ -7,8 +7,9 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_library(jz
-    tokenizer.c
     str.c
+    tokenizer.c
+    utf8_reader.c
 )
 
 find_package(ICU REQUIRED COMPONENTS uc)

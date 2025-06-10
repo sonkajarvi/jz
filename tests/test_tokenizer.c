@@ -3,36 +3,44 @@
 #include <str.h>
 #include <token.h>
 #include <tokenizer.h>
+#include <utf8_reader.h>
 #include <vec.h>
 
 #include "test.h"
 
-#define ASSERT_TOKEN(str, expected) do {  \
-    struct context ctx;                   \
-    struct token tok;                     \
-    ctx.bytes = (void *)str;              \
-    ctx.size = strlen(str);               \
-    ctx.index = 0;                        \
-    ASSERT_EQ(next_token(&ctx, &tok), 0); \
+#define ASSERT_TOKEN(str, expected) do {       \
+    struct utf8_reader rdr = UTF8_READER_INIT; \
+    struct context ctx;                        \
+    struct token tok;                          \
+    ctx.reader = rdr.reader;                   \
+    ctx.bytes = (void *)str;                   \
+    ctx.size = strlen(str);                    \
+    ctx.index = 0;                             \
+    ASSERT_EQ(next_token(&ctx, &tok), 0);      \
     ASSERT_EQ(tok.type, expected); } while (0)
 
-#define ASSERT_IDENTIFIER(src, expected) do { \
-    struct context ctx;                       \
-    struct token tok;                         \
-    struct string str;                        \
-    ctx.bytes = (void *)src;                  \
-    ctx.size = strlen(src);                   \
-    ctx.index = 0;                            \
-    ASSERT_EQ(next_token(&ctx, &tok), 0);     \
-    ASSERT_EQ(tok.type, TOKEN_IDENTIFIER);    \
-    S(&str, expected);                        \
-    ASSERT_EQ(string_eq(&tok.str, &str), 1);  \
-    string_free(&str); } while (0)
-
-#define ASSERT_STRING(src, expected) do {      \
+#define ASSERT_IDENTIFIER(src, expected) do {  \
+    struct utf8_reader rdr = UTF8_READER_INIT; \
     struct context ctx;                        \
     struct token tok;                          \
     struct string str;                         \
+    ctx.reader = rdr.reader;                   \
+    ctx.bytes = (void *)src;                   \
+    ctx.size = strlen(src);                    \
+    ctx.index = 0;                             \
+    ASSERT_EQ(next_token(&ctx, &tok), 0);      \
+    ASSERT_EQ(tok.type, TOKEN_IDENTIFIER);     \
+    S(&str, expected);                         \
+    ASSERT_EQ(string_eq(&tok.str, &str), 1);   \
+    string_free(&tok.str);                     \
+    string_free(&str); } while (0)
+
+#define ASSERT_STRING(src, expected) do {      \
+    struct utf8_reader rdr = UTF8_READER_INIT; \
+    struct context ctx;                        \
+    struct token tok;                          \
+    struct string str;                         \
+    ctx.reader = rdr.reader;                   \
     ctx.bytes = (void *)src;                   \
     ctx.size = strlen(src);                    \
     ctx.index = 0;                             \
